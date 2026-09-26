@@ -72,14 +72,14 @@ the audit trail.
 
 | Gate | Status | Responsibility |
 |---|---|---|
-| 1. Identity | ✅ Implemented | Verifies the acting identity against a registry; fails closed on unknown/mismatched identities |
-| 2. Intent | 🔜 Planned (Stage 3) | Classify what the actor is attempting to do |
-| 3. Trust | 🔜 Planned (Stage 3) | Classify trust of external content/context |
-| 4. Permission | ✅ Implemented | Declarative allow/deny policy, deny always wins |
-| 5. Tool / Action | ✅ Implemented | Tools are security boundaries; checks registration + delegates to Permission |
-| 6. Data / Memory | 🔜 Planned (Stage 4) | PII/secret detection, memory isolation, classification |
-| 7. Risk / Approval | 🔜 Planned (Stage 3/4) | Risk scoring, human-in-the-loop approval |
-| 8. Audit / Output | ✅ Implemented | Every decision from every gate, including denials, becomes a structured event |
+| 1. Identity | Implemented | Verifies the acting identity against a registry; fails closed on unknown/mismatched identities |
+| 2. Intent | Planned (Stage 3) | Classify what the actor is attempting to do |
+| 3. Trust | Planned (Stage 3) | Classify trust of external content/context |
+| 4. Permission | Implemented | Declarative allow/deny policy, deny always wins |
+| 5. Tool / Action | Implemented | Tools are security boundaries; checks registration + delegates to Permission |
+| 6. Data / Memory | Planned (Stage 4) | PII and secret detection, memory isolation, and data classification |
+| 7. Risk / Approval | Planned (Stage 3/4) | Risk assessment, risk-based controls, and human approval |
+| 8. Audit / Output | Implemented | Every decision from each gate, including denials, is recorded as a structured audit event |
 
 `SecureAgent.call_tool()` runs the implemented chain end to end:
 **Identity → Tool (→ Permission) → execution → Audit**.

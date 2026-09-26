@@ -96,9 +96,9 @@ see §6 for what's explicitly out of scope today.
 
 ## 5. Roadmap (stages, from the original spec)
 
-- **Stage 1 — Foundation** ✅ done: domain models, gate interface, decision
+- **Stage 1 — Foundation** — Implemented: domain models, gate interface, decision
   model, audit event model.
-- **Stage 2 — Core security** ✅ done: Identity, Permission, Tool, Audit
+- **Stage 2 — Core Security** — Implemented: Identity, Permission, Tool, Audit
   gates; `SecureAgent.call_tool()`.
 - **Stage 3 — AI security**: Intent Gate, Trust Gate, prompt-injection
   detection, `SecureAgent.run()` wired to an LLM.
