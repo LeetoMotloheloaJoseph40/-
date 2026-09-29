@@ -15,7 +15,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from eightgates.core.models import DataClassification, RiskLevel
+from eightgates.core.models import DataClassification, RiskLevel, TrustLevel
 
 
 class ToolCapability(BaseModel):
@@ -27,6 +27,9 @@ class ToolCapability(BaseModel):
     reversible: bool = True
     network_access: bool = False
     data_sensitivity: DataClassification = DataClassification.INTERNAL
+    # How much the Trust Gate should trust what this tool RETURNS. Tool output
+    # is untrusted unless the developer explicitly says otherwise.
+    output_trust: TrustLevel = TrustLevel.UNTRUSTED
 
 
 @dataclasses.dataclass
@@ -63,6 +66,7 @@ def secure_tool(
     reversible: bool = True,
     network_access: bool = False,
     data_sensitivity: DataClassification | str = DataClassification.INTERNAL,
+    output_trust: TrustLevel | str = TrustLevel.UNTRUSTED,
     description: str = "",
 ) -> Callable[[Callable], Tool]:
     """
@@ -90,6 +94,9 @@ def secure_tool(
                 DataClassification(data_sensitivity)
                 if isinstance(data_sensitivity, str)
                 else data_sensitivity
+            ),
+            output_trust=(
+                TrustLevel(output_trust) if isinstance(output_trust, str) else output_trust
             ),
         )
         tool = Tool(

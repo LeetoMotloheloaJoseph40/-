@@ -2,56 +2,49 @@
 
 ## Reporting a vulnerability
 
-This is an early scaffold, not a hardened production system. If you find
-a security issue, please open an issue describing it rather than relying
-on any of the guarantees below in production as-is.
+This is an early project, not a hardened production system. If you find a security
+issue, please open an issue describing it, and do not rely on the guarantees below in
+production as-is.
 
-## What is actually guaranteed today
+## What is guaranteed today (each is covered by tests)
 
-- **Fail-closed authorization.** `PermissionGate` denies when no policy is
-  registered, and `Policy.permits()` treats an explicit deny as always
-  winning over an explicit allow. There is no wildcard/"allow everything"
-  default anywhere in the gate chain.
-- **No execution without authorization.** `SecureAgent.call_tool()` never
-  invokes the underlying tool function unless both the Identity Gate and
-  the Tool Gate (which itself calls the Permission Gate) return `ALLOW`.
-  This is enforced by control flow (the call happens after both checks,
-  guarded by early returns/raises), not by convention.
-- **Complete audit trail for tool calls.** Every `SecurityDecision`
-  produced during `call_tool()` — identity check, tool/permission check,
-  and a completion event — is written to `AuditLogger` before the method
-  returns or raises `GateDenied`/`UnknownToolError`. Denials are logged,
-  not just successes.
-- **Identity/permission/trust/risk stay separate types.** `AgentIdentity`
-  never carries permissions; `Policy` never carries identity data. This is
-  a design property you can rely on for auditing the code, not just a
-  claim in prose.
+- **Fail-closed authorization.** No policy → deny. Explicit deny beats explicit allow.
+  No wildcard "allow everything" default exists anywhere in the gate chain.
+- **No execution without authorization.** A tool body only runs after every applicable
+  gate returns ALLOW; this is enforced by control flow, not convention.
+- **Policy snapshot.** `SecureAgent` copies the `Policy` it is given, so mutating your
+  object afterwards cannot change what the agent is authorized to do.
+- **The planner is untrusted.** In `run()`, model-proposed calls are checked against
+  identity, intent scope, trust taint and permissions; a proposed tool name is never
+  echoed into a trusted context unless it is a tool you registered.
+- **Recognisable injections are quarantined** before the planner sees them, and
+  audit entries record the *source label and rule names only*, never the payload.
+- **Untrusted content cannot trigger declared side effects unattended.** Once a run has
+  processed untrusted content (even content that was then quarantined), tools declared
+  `external_effect=True` are not executed without approval.
+- **Intent scoping (when configured).** Unrecognised requests are denied, ambiguous
+  ones escalated, and tool calls outside the classified intent's scope denied.
+- **Complete audit trail.** Every gate decision, allowed or not, is recorded under one
+  `trace_id` per run.
 
-## What is explicitly NOT guaranteed (see ARCHITECTURE.md §6 for the full list)
+## What is NOT guaranteed
 
-- **No prompt-injection defense.** There is no Trust Gate and no LLM
-  integration yet. `SecurityContext.input_trust` is an unused field.
-- **No risk-based approval.** A tool's `risk_level` is descriptive
-  metadata that reaches the audit log; nothing currently blocks a
-  `CRITICAL`-risk tool call pending human approval. If you need that
-  today, implement it yourself at the call site until the Risk/Approval
-  Gate (Stage 4) exists.
-- **No data-loss prevention / PII or secret detection.** The Data/Memory
-  Gate does not exist yet. Do not rely on this framework to redact
-  sensitive output.
-- **No memory security.** There is no memory subsystem at all yet.
-- **No protection against a compromised policy or identity store.**
-  `IdentityRegistry` and `PolicyEngine` are plain in-memory Python objects
-  with no access control of their own; whoever can call `.register()` can
-  grant any permission to any identity.
-- **Not a guarantee that any agent built with this is "secure."** 8 Gates
-  gives you explicit, testable control points. It cannot make a
-  fundamentally unsafe tool (e.g. unrestricted shell execution registered
-  with a `LOW` risk label) safe — that judgment call is still yours.
+- **Detection is not comprehensive.** The heuristic injection detector misses
+  paraphrased, translated, encoded, and homoglyph-obfuscated payloads. The test
+  `test_KNOWN_LIMITATION_paraphrased_injection_is_not_detected` exists to keep this visible.
+- **Side-effect declarations are trusted.** If a dangerous tool is registered with
+  `external_effect=False`, the taint rule will not protect it. That judgment is yours.
+- **Coarse taint.** No per-value data-flow tracking (see ARCHITECTURE.md §6).
+- **No human-approval flow.** `REQUIRE_APPROVAL` means "not executed"; nothing can approve it yet.
+- **Trusted sources are not scanned.** Content labelled `"user"` or `"system"` skips
+  injection scanning. Mislabelling untrusted content as trusted defeats the Trust gate.
+- **`call_tool()` bypasses Intent and Trust** by design (it has no request or context).
+- **Tool arguments are not validated by the framework.** Planner-supplied arguments go
+  to your tool function as-is; validate them inside the tool.
+- **No data-loss prevention, PII/secret detection, or memory security** (Stage 4).
+- **No protection from a compromised policy/identity store.** Registries are plain
+  in-memory objects; whoever can call `.register()` can grant anything.
+- **The audit log is in-memory and not tamper-evident.**
+- **Not a guarantee that any agent built with this is secure.**
 
-## Reporting policy claims that don't match implementation
-
-If you find a docstring, README line, or comment that overstates what a
-control actually does, treat that as a bug: security claims here must
-correspond to real implementation behavior (see the Stage 2 development
-rule this project follows).
+If a docstring, README line or comment overstates what a control does, treat it as a bug.

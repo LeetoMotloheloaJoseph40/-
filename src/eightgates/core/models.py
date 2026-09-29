@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -110,7 +111,6 @@ class SecurityContext(BaseModel):
     user: UserIdentity | None = None
     action: str
     resource: str | None = None
-    input_trust: TrustLevel = TrustLevel.UNTRUSTED
     metadata: dict = Field(default_factory=dict)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -137,3 +137,27 @@ class ApprovalRequest(BaseModel):
     reason: str
     risk: RiskAssessment
     approved: bool | None = None
+
+
+class ContextItem(BaseModel):
+    """
+    One piece of content entering an agent's context window, with its origin.
+
+    `source` is a developer-assigned label for where the content came from
+    ("user", "system", "web", "email", "tool:fetch_page", ...). It is never
+    derived from the content itself. `trust` may be set explicitly; if left
+    as None the Trust Gate resolves it from the source via a TrustPolicy,
+    defaulting to UNTRUSTED for unknown sources (fail closed).
+    """
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
+    content: str
+    source: str
+    trust: TrustLevel | None = None
+
+
+class ToolCallRequest(BaseModel):
+    """A tool invocation *proposed* by a planner (e.g. an LLM). Not yet authorized."""
+
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
