@@ -14,12 +14,23 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from eightgates.core.decisions import SecurityDecision
-from eightgates.core.models import ContextItem, ToolCallRequest
+from eightgates.core.models import ApprovalRequest, ContextItem, ToolCallRequest
 
 
 class Planner(Protocol):
     def plan(self, request: str, context: Sequence[ContextItem]) -> Sequence[ToolCallRequest]:
         """Return proposed tool calls for the next step; an empty sequence means 'done'."""
+        ...
+
+
+class Approver(Protocol):
+    def decide(self, request: ApprovalRequest) -> bool:
+        """
+        Approve or deny ONE specific ApprovalRequest. The request carries the
+        agent, action, resource, reason and full RiskAssessment (including why
+        it was held, e.g. untrusted content) — a real implementation should
+        show a human that context, not just a yes/no prompt.
+        """
         ...
 
 

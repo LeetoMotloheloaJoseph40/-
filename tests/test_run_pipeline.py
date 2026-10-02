@@ -16,6 +16,7 @@ from eightgates import (
     TrustLevel,
     secure_tool,
 )
+from eightgates.testing.approvers import ApproveAllApprover
 from eightgates.testing.planners import RepeatingPlanner, ScriptedPlanner
 
 IDENTITY = AgentIdentity(id="support-agent", owner="support-team", role="customer-service")
@@ -34,7 +35,12 @@ class Env:
     """Builds an agent whose tools record their side effects, so tests can prove non-execution."""
 
     def __init__(
-        self, page_text="Weather is sunny.", lookup_trust=TrustLevel.UNTRUSTED, policy=POLICY, **agent_kwargs
+        self,
+        page_text="Weather is sunny.",
+        lookup_trust=TrustLevel.UNTRUSTED,
+        policy=POLICY,
+        approver=None,
+        **agent_kwargs,
     ):
         self.sent: list[tuple[str, str]] = []
 
@@ -65,6 +71,7 @@ class Env:
             identity=IDENTITY,
             policy=policy,
             tools=[lookup_customer, fetch_page, send_email, explode],
+            approver=approver,
             **agent_kwargs,
         )
 
@@ -116,20 +123,39 @@ def test_injection_that_evades_detection_still_cannot_trigger_a_side_effect():
     assert not result.quarantined_sources  # detector missed it, as documented
     assert env.sent == []  # ...but nothing was sent
     stopped = result.stopped[0]
-    assert stopped.decision.gate == "trust"
-    assert stopped.decision.decision == DecisionType.REQUIRE_APPROVAL
+    assert stopped.decision.gate == "approval"  # trust's hold, resolved (denied, no approver)
+    assert stopped.decision.decision == DecisionType.DENY
 
 
-def test_side_effect_tool_is_allowed_when_context_is_only_trusted():
+def test_side_effect_tool_with_clean_context_still_needs_approval_by_default():
+    """
+    Stage 4 change: send_email is CRITICAL per the Risk Gate's scoring (HIGH declared
+    risk + external effect + irreversible), so it now requires approval even with a
+    fully trusted context. Without an approver configured, it stays held -- same
+    fail-closed default as everything else.
+    """
     env = Env()
+    planner = ScriptedPlanner([[call("send_email", to="a@b.com", body="hi")]])
+    result = env.agent.run("email a@b.com hi", planner)
+    assert env.sent == []
+    assert result.stopped[0].decision.gate == "approval"
+    assert result.stopped[0].decision.decision == DecisionType.DENY
+
+
+def test_side_effect_tool_executes_once_an_approver_grants_it():
+    env = Env(approver=ApproveAllApprover())
     planner = ScriptedPlanner([[call("send_email", to="a@b.com", body="hi")]])
     result = env.agent.run("email a@b.com hi", planner)
     assert env.sent == [("a@b.com", "hi")]
     assert result.executed
+    approval_events = [e for e in env.decisions(result.trace_id) if e == DecisionType.ALLOW]
+    assert approval_events  # the approval itself is on the audit trail too
+    assert env.agent.approval_store.all()  # and recorded as a specific, scoped request
 
 
 def test_tool_with_explicitly_trusted_output_does_not_taint_the_run():
-    env = Env(lookup_trust=TrustLevel.TRUSTED)
+    """Taint-wise this run is clean; send_email still needs approval on its own CRITICAL risk score."""
+    env = Env(lookup_trust=TrustLevel.TRUSTED, approver=ApproveAllApprover())
     planner = ScriptedPlanner(
         [[call("lookup_customer", customer_id="42")], [call("send_email", to="a@b.com", body="hi")]]
     )
@@ -260,8 +286,8 @@ def test_quarantining_an_injection_does_not_clear_the_runs_taint():
 
     assert result.quarantined_sources == ["tool:fetch_page"]
     assert env.sent == []
-    assert result.stopped[0].decision.gate == "trust"
-    assert result.stopped[0].decision.decision == DecisionType.REQUIRE_APPROVAL
+    assert result.stopped[0].decision.gate == "approval"
+    assert result.stopped[0].decision.decision == DecisionType.DENY
 
 
 def test_injection_quarantined_from_initial_context_also_taints_the_run():

@@ -24,6 +24,8 @@ import unicodedata
 from dataclasses import dataclass
 
 # Zero-width / invisible characters commonly used to split keywords.
+# Shared with security/secrets.py - both need to strip the same invisible characters
+# before pattern matching, so obfuscation tricks only need defeating once.
 _INVISIBLE = dict.fromkeys(
     map(ord, "\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\ufeff\u00ad")
 )
